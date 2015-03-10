@@ -1,7 +1,5 @@
 import ctypes as c
 import ctypes.wintypes as w
-import vkdefs
-import threading
 
 
 INFINITE = 0xFFFFFFFF
@@ -77,14 +75,8 @@ def errcheck(result, func, args):
 	if E_OK != result:
 		raise HotmonError(result)
 	return args
-
-
-#hmCreate_proto = c.CFUNCTYPE(c.c_int, c.c_int)
-#hmCreate_paraf = (1, "hm", 0), 
-#hmCreate = hmCreate_proto(("hmCreate", dll), hmCreate_paraf)
-#hmCreate.errcheck = errcheck
-
-
+	
+	
 class API(object):
 	def __init__(self, *signature):
 		"""The arguments to this constructor are caught in 'signature',
@@ -126,38 +118,3 @@ def hmRegister(): pass
 
 @API(("hm", PPHOTMON, None), ("hk", PHOTKEY, None))
 def hmUnregister(): pass
-
-
-if "__main__" == __name__:
-	event = threading.Event()
-	
-	def quit_callback(param):
-		event.set()
-		
-	def action_callback(param):
-		print "f1"
-		
-	# these are important! otherwise they'll get garbage collected!
-	quit_callback_ref = CALLBACK(quit_callback)
-	action_callback_ref = CALLBACK(action_callback)
-	
-	hm = PHOTMON()
-	hmCreate(hm)
-	hmStart(hm)
-	
-	quit_hk = HOTKEY()
-	hmCreateHotkey(hm, quit_hk, vkdefs.VK_ESCAPE, 0, quit_callback_ref)
-	
-	action_hk = HOTKEY()
-	hmCreateHotkey(hm, action_hk, vkdefs.VK_F1, vkdefs.MOD_CONTROL|vkdefs.MOD_SHIFT, action_callback_ref)
-	
-	hmAddHotkey(hm, quit_hk)
-	hmAddHotkey(hm, action_hk)
-	
-	print "(to quit the app, hit the ESC key)"
-	print "(try pressing CTRL+SHIFT+F1)"
-	event.wait()
-	
-	hmStop(hm)
-	hmDelete(hm)
-	
