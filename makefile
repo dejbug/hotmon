@@ -1,15 +1,24 @@
-hotmon.dll: hotmon.o hotkey.o debug.o
-	@g++ -o $@ $^ -shared
+#include debug.mk
+MODE:=debug
 
-test.exe: test.o hotmon.dll
-	@g++ -o $@ $^
+.PHONY: debug
+debug:
+	$(eval MODE:=debug)
+	@echo (building $(MODE).mk)
+#	@make -f $(MODE).mk 1>NUL
 
-test: hotmon.dll test.exe
-	@.\test.exe
+.PHONY: release
+release:
+	$(eval MODE:=release)
+	@echo (building $(MODE).mk)
+#	@make -f $(MODE).mk 1>NUL
+
+%:
+	@make -f $(MODE).mk $@ 1>NUL
 
 clean:
-	@del *.exe *.o *.pyc 2>NUL
+	@del *.o *.pyc test.exe 2>NUL
 
-reset:
+clobber:
 	@make clean 1>NUL
-	@del *.dll 2>NUL
+	@del hotmon.dll hotmon.zip 2>NUL

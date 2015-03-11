@@ -1,6 +1,6 @@
-#include "hotkey.h"
-
 #include <stdlib.h>
+#include "hotkey.h"
+#include "debug.h"
 
 
 template<size_t N> void MakeRandomString(char buf[N], LPCSTR alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
@@ -24,10 +24,10 @@ int hkCreate(PHOTKEY hk, UINT vk, UINT mod, Callback callback, LPVOID param) {
 	
 	hk->id = GlobalAddAtom(name);
 	if(!hk->id) {
-		OutputDebugString("! failed to register hotkey atom");
+		debugf("! failed to register hotkey atom");
 		return E_ATOM_CREATE;
 	}
-	else OutputDebugString("* hotkey atom registered");
+	else debugf("* hotkey atom registered");
 	
 	return E_OK;
 }
@@ -36,10 +36,11 @@ int hkCreate(PHOTKEY hk, UINT vk, UINT mod, Callback callback, LPVOID param) {
 int hkDelete(PHOTKEY hk) {
 	if(!hk) return E_NULL_ARG;
 	
-	if(hk->id)
+	if(hk->id) {
 		if(!DeleteAtom(hk->id))
-			OutputDebugString("* hotkey atom unregistered");
-		else OutputDebugString("! failed to unregister hotkey atom");
+			debugf("* hotkey atom unregistered");
+		else debugf("! failed to unregister hotkey atom");
+	}
 	
 	return E_OK;
 }

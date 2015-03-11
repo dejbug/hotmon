@@ -10,7 +10,7 @@
 #include <stdlib.h>
 
 
-BOOL WINAPI DllMain(HINSTANCE i, DWORD r, LPVOID) {
+BOOL WINAPI DllMain(HINSTANCE, DWORD r, LPVOID) {
 	switch(r) {
 		case DLL_PROCESS_ATTACH: break;
 		case DLL_PROCESS_DETACH: break;
@@ -41,20 +41,20 @@ public:
 		WNDCLASSEX info;
 		memset(&info, 0, sizeof(WNDCLASSEX));
 		if(GetClassInfoEx(wc.hInstance, wc.lpszClassName, &info)) {
-			OutputDebugString("! hotmon window class already registered");
+			debugf("! hotmon window class already registered");
 			return;
 		}
 		
 		if(!RegisterClassEx(&wc)) {
-			OutputDebugString("! unable to register hotmon window class");
+			debugf("! unable to register hotmon window class");
 			throw std::runtime_error("couldn't register hotmon window class");
 		}
-		else OutputDebugString("* hotmon window class registered");
+		else debugf("* hotmon window class registered");
 	}
 	virtual ~HotmonWindowClass() {
 		if(!owned) return;
 		UnregisterClass(wc.lpszClassName, wc.hInstance);
-		OutputDebugString("* hotmon window class unregistered");
+		debugf("* hotmon window class unregistered");
 	}
 	operator WNDCLASSEX() { return wc; }
 	LPCSTR name() const { return wc.lpszClassName; }
@@ -71,7 +71,7 @@ public:
 			CW_USEDEFAULT, CW_USEDEFAULT, 100, 100,
 			NULL, NULL, wc.instance(), NULL);
 		if(!handle) {
-			OutputDebugString("! unable to create hotmon window");
+			debugf("! unable to create hotmon window");
 			throw std::runtime_error("couldn't create hotmon window");
 		}
 	}
@@ -96,27 +96,26 @@ LRESULT CALLBACK MonitorProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 	
 	switch(m) {
 		case WM_CREATE: {
-			OutputDebugString("WM_CREATE");
+			debugf("WM_CREATE");
 			break;
 		}
 		case WM_CLOSE: {
-			OutputDebugString("WM_CLOSE");
+			debugf("WM_CLOSE");
 			DestroyWindow(h);
 			break;
 		}
 		case WM_DESTROY: {
-			OutputDebugString("WM_DESTROY");
-			//hk = std::auto_ptr<Hotkey>();
+			debugf("WM_DESTROY");
 			PostQuitMessage(0);
 			break;
 		}
 		case WM_HOTKEY: {
 			const ATOM id = (ATOM)w;
-			const UINT mod = (UINT)LOWORD(l);
-			const UINT vk = (UINT)HIWORD(l);
-			OutputDebugString("WM_HOTKEY");
+			//const UINT mod = (UINT)LOWORD(l);
+			//const UINT vk = (UINT)HIWORD(l);
+			debugf("WM_HOTKEY");
 			debugf("# looking for hotkey with id %08X", id);
-			for(int i=0; i<kk.size(); ++i) {
+			for(size_t i=0; i<kk.size(); ++i) {
 				if(kk[i].id == id) {
 					debugf("# found %d-th hotkey with id %08X", i, id);
 					if(kk[i].callback) kk[i].callback(kk[i].param);
@@ -127,9 +126,9 @@ LRESULT CALLBACK MonitorProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 		}
 		case HM_QUIT: {
 			PHOTMON* hm = (PHOTMON*)w;
-			OutputDebugString("HM_QUIT");
+			debugf("HM_QUIT");
 			
-			for(int i=0; i<kk.size(); ++i) {
+			for(size_t i=0; i<kk.size(); ++i) {
 				hmUnregister(hm, &kk[i]);
 				hkDelete(&kk[i]);
 				(*hm)->tid = 0;
@@ -145,7 +144,7 @@ LRESULT CALLBACK MonitorProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 		case HM_ADD_HOTKEY: {
 			PHOTMON* hm = (PHOTMON*)w;
 			PHOTKEY hk = (PHOTKEY)l;
-			OutputDebugString("HM_ADD_HOTKEY");
+			debugf("HM_ADD_HOTKEY");
 			
 			hmRegister(hm, hk);
 			kk.push_back(*hk);
@@ -178,10 +177,6 @@ API int hmCreate(PHOTMON* hm) {
 	
 	memset(*hm, 0, sizeof(HOTMON));
 	
-	// create the notifier event. this will be
-	// used to wait for the thread to start up,
-	// so we don't start adding our hotkeys before
-	// the window will be able to handle them.
 	(*hm)->event = CreateEvent(NULL, TRUE, FALSE, NULL);
 	if(!(*hm)->event) return E_EVENT_CREATE;
 	
@@ -265,20 +260,29 @@ API int hmCreateHotkey(PPHOTMON hm, PHOTKEY hk, UINT vk, UINT mod, Callback call
 API int hmRegister(PHOTMON* hm, PHOTKEY hk) {
 	if(!hm) return E_NULL_ARG;
 	if(!hk) return E_NULL_ARG;
-	if(!hk->id) E_HOTKEY_NOT_INIT;
-	if(!RegisterHotKey((*hm)->hwnd, hk->id, hk->mod, hk->vk))
-			OutputDebugString("! failed to register hotmon hotkey");
-		else OutputDebugString("* hotmon hotkey registered");
+	if(!hk->id) return E_HOTKEY_NOT_INIT;
+	
+	if(!RegisterHotKey((*hm)->hwnd, hk->id, hk->mod, hk->vk)) {
+		debugf("! failed to register hotmon hotkey");
+		return E_HOTKEY_REGISTER;
+	}
+	
+	debugf("* hotmon hotkey registered");
+	return E_OK;
 }
 
 
 API int hmUnregister(PHOTMON* hm, PHOTKEY hk) {
 	if(!hm) return E_NULL_ARG;
 	if(!hk) return E_NULL_ARG;
-	if(!hk->id) E_HOTKEY_NOT_INIT;
+	if(!hk->id) return E_HOTKEY_NOT_INIT;
 
-	if(!UnregisterHotKey((*hm)->hwnd, hk->id))
-		OutputDebugString("! failed to unregister hotmon hotkey");
-	else OutputDebugString("* hotmon hotkey unregistered");
+	if(!UnregisterHotKey((*hm)->hwnd, hk->id)) {
+		debugf("! failed to unregister hotmon hotkey");
+		return E_HOTKEY_UNREGISTER;
+	}
+	
+	debugf("* hotmon hotkey unregistered");
+	return E_OK;
 }
 

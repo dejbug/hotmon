@@ -7,12 +7,12 @@
 #include "hotmon.h"
 
 
-void __cdecl f10_callback(LPVOID param) {
+void __cdecl f10_callback(LPVOID) {
 	printf("f10\n");
 }
 
 
-void __cdecl f11_callback(LPVOID param) {
+void __cdecl f11_callback(LPVOID) {
 	printf("f11\n");
 }
 
