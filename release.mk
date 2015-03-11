@@ -1,4 +1,3 @@
-#$(eval CPPFLAGS:=-g) 
 CPPFLAGS:=-DNDEBUG -Wall -std=c++98 -pedantic -Wextra -Wconversion
 DEBUG_OBJ:=debug.o
 

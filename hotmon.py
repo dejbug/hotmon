@@ -17,7 +17,7 @@ E_START_TIMEOUT		= 8
 E_STOP_TIMEOUT		= 9
 E_ATOM_CREATE		= 10
 E_HOTKEY_NOT_INIT	= 11
-E_TIMEOUT			= 12
+E_TIMEOUT			= 12	# obsolete
 E_HOTKEY_REGISTER	= 13
 E_HOTKEY_UNREGISTER	= 14
 
@@ -83,10 +83,9 @@ def errcheck(result, func, args):
 	
 class API(object):
 	def __init__(self, *signature):
-		"""The arguments to this constructor are caught in 'signature',
+		"""The arguments to this decorator are caught in 'signature',
 		which is a sequence of 3-tuples (arg_name, arg_type, arg_default).
-		In this version, all arguments are supposed to be input arguments
-		and will have the default value of 0."""
+		In this version, all arguments are supposed to be input arguments."""
 		
 		arg_types = (c.c_int, ) + tuple(item[1] for item in signature)
 		
