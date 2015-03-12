@@ -1,20 +1,4 @@
-#include debug.mk
-MODE:=debug
-
-.PHONY: debug
-debug:
-	$(eval MODE:=debug)
-	@echo (building $(MODE).mk)
-#	@make -f $(MODE).mk 1>NUL
-
-.PHONY: release
-release:
-	$(eval MODE:=release)
-	@echo (building $(MODE).mk)
-#	@make -f $(MODE).mk 1>NUL
-
-%:
-	@make -f $(MODE).mk $@ 1>NUL
+include debug.mk
 
 clean:
 	@del *.o *.pyc test.exe 2>NUL
