@@ -144,6 +144,17 @@ class Hotmon(object):
 		
 		self.hm = None
 		
+	def __enter__(self):
+		self.create()
+		return self
+		
+	def __exit__(self, x, m, t):
+		try:
+			self.destroy()
+		except Exception, e:
+			if None is x:
+				raise e
+				
 	def create(self):
 		if self.hm:
 			raise HotmonError, E_ALREADY_RUNNING
@@ -167,14 +178,14 @@ class Hotmon(object):
 				raise e
 		finally:
 			self.event.set()
-				
+			
 	def wait(self):
 		if None is self.hm:
 			raise HotmonError, E_NOT_RUNNING
 			
 		# wait for stop() to be called
 		self.event.wait()
-			
+		
 	def add(self, callback, vk, mod=0):
 		if None is self.hm:
 			raise HotmonError, E_NOT_RUNNING
