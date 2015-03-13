@@ -289,18 +289,6 @@ API int hmStop(PHOTMON* hm, DWORD msec) {
 }
 
 
-/*
-API int hmAddHotkey(PHOTMON* hm, UINT vk, UINT mod, Callback callback, LPVOID param) {
-	if(!hm) return E_NULL_ARG;
-	if(!(*hm)->tid) return E_NOT_RUNNING;
-	HOTKEY hk;
-	memset(&hk, 0, sizeof(hk));
-	hkCreate(&hk, vk, mod, callback, param);
-	return hmAddHotkey(hm, &hk);
-}
-*/
-
-
 API int hmAddHotkey(PHOTMON* hm, PHOTKEY hk) {
 	if(!hm) return E_NULL_ARG;
 	if(!hk) return E_NULL_ARG;
