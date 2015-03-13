@@ -1,5 +1,12 @@
 import ctypes as c
 import ctypes.wintypes as w
+import threading
+
+# These are all the includes we need, but i like to keep my namespaces
+#	separate.
+#from ctypes import CDLL, CFUNCTYPE, POINTER, Structure, c_int
+#from ctypes.wintypes import LPVOID, HANDLE, HWND, ATOM, DWORD, UINT
+#from threading import Event as threading_Event
 
 
 INFINITE = 0xFFFFFFFF
@@ -42,10 +49,14 @@ E_LABELS = [
 
 class Error(Exception): pass
 
-class HotmonError(Error):
+
+class ApiError(Error):
 	def __init__(self, code):
 		self.code = code
 		Error.__init__(self, "[%d] (%s)" % (self.code, E_LABELS[self.code]))
+		
+		
+class HotmonError(ApiError): pass
 
 
 dll = c.CDLL("hotmon.dll")
@@ -77,7 +88,7 @@ PHOTKEY = c.POINTER(HOTKEY)
 
 def errcheck(result, func, args):
 	if E_OK != result:
-		raise HotmonError(result)
+		raise ApiError(result)
 	return args
 	
 	
@@ -121,3 +132,62 @@ def hmRegister(): pass
 
 @API(("hm", PPHOTMON, None), ("hk", PHOTKEY, None))
 def hmUnregister(): pass
+
+
+class Hotmon(object):
+	def __init__(self):
+		self.event = threading.Event()
+		
+		# we need to keep the callbacks around so they don't
+		#	get garbage collected prematurely.
+		self.callbacks = []
+		
+		self.hm = None
+		
+	def create(self):
+		if self.hm:
+			raise HotmonError, E_ALREADY_RUNNING
+			
+		self.hm = PHOTMON()
+		hmCreate(self.hm)
+		hmStart(self.hm)
+		
+	def destroy(self):
+		if self.hm:
+			self.stop()
+			hmDelete(self.hm)
+			self.hm = None
+			
+	def stop(self):
+		# stop, if not already
+		try:
+			hmStop(self.hm)
+		except ApiError, e:
+			if E_NOT_RUNNING != e.code:
+				raise e
+		finally:
+			self.event.set()
+				
+	def wait(self):
+		if None is self.hm:
+			raise HotmonError, E_NOT_RUNNING
+			
+		# wait for stop() to be called
+		self.event.wait()
+			
+	def add(self, callback, vk, mod=0):
+		if None is self.hm:
+			raise HotmonError, E_NOT_RUNNING
+			
+		#TODO: add a check to see whether the vk+mod was
+		#	already defined. then do something useful with
+		#	that information :) (i.e. either redefine
+		#	it or raise hell).
+		
+		cb = CALLBACK(callback)
+		self.callbacks.append(cb)
+		
+		hk = HOTKEY()
+		hmCreateHotkey(self.hm, hk, vk, mod, cb)
+		hmAddHotkey(self.hm, hk)
+		
