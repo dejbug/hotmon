@@ -78,6 +78,70 @@ public:
 	virtual ~HotmonWindow() {
 	}
 	operator HWND() { return handle; }
+public:
+	void associate(PHOTMON* hm) const {
+		if(!hm || !*hm)
+			throw std::runtime_error("HotmonWindow::associate needs a valid PPHOTMON");
+		(*hm)->hwnd = handle;
+		SetWindowLong(handle, GWL_USERDATA, (LONG)hm);
+	}
+};
+
+
+//NOTE: We could put this functionality into HotmonWindow, but i didn't
+//	like to bloat the class.
+//FIXME: If we wanted to signal hmStop with this, say, from within the
+//	end of the RunMainLoop, the IsWindow(handle) check would need to be
+//	dropped.
+class HotmonContext {
+private:
+	HWND handle;
+	PHOTMON* hm;
+public:
+	HotmonContext(HWND handle) : handle(handle) {
+		if(!handle || !IsWindow(handle))
+			throw std::runtime_error("HotmonContext needs a valid HWND");
+		hm = (PHOTMON*)GetWindowLong(handle, GWL_USERDATA);
+		if(!hm || !*hm)
+			throw std::runtime_error("HotmonContext failed to retrieve associated PHOTMON*");
+		handle = (*hm)->hwnd;
+	}
+	HotmonContext(PHOTMON* hm) : hm(hm) {
+		if(!hm || !*hm)
+			throw std::runtime_error("HotmonContext needs a valid PHOTMON*");
+		handle = (*hm)->hwnd;
+		if(!handle || !IsWindow(handle))
+			throw std::runtime_error("HotmonContext failed to retrieve associated HWND");
+	}
+public:
+	HWND getWindowHandle() const {
+		return handle;
+	}
+	
+	PHOTMON* getHotmonHandle() const {
+		return hm;
+	}
+private:
+	void signal() const {
+		SetEvent((*hm)->event);
+	}
+public:
+	// This is supposed to be called when the main thread starts.
+	void sendStartSignal() const {
+		signal();
+	}
+	
+	// We intend to call this from the WM_DESTROY handler shortly
+	//	before the WM_QUIT will break the main thread's loop.
+	void sendStopSignal() const {
+		// This is how the API functions tell whether the main thread
+		//	is running. We set it to 0 to indicate the thread is done,
+		//	even though the thread might still be running for a second
+		//	longer.
+		(*hm)->tid = 0;
+		
+		signal();
+	}
 };
 
 
@@ -106,6 +170,9 @@ LRESULT CALLBACK MonitorProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 		}
 		case WM_DESTROY: {
 			debugf("WM_DESTROY");
+			
+			HotmonContext(h).sendStopSignal();
+			
 			PostQuitMessage(0);
 			break;
 		}
@@ -131,12 +198,7 @@ LRESULT CALLBACK MonitorProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 			for(size_t i=0; i<kk.size(); ++i) {
 				hmUnregister(hm, &kk[i]);
 				hkDelete(&kk[i]);
-				(*hm)->tid = 0;
 			}
-			
-			//TODO: To be extra safe, we should store the PHOTMON
-			//	and signal its event before the MainLoop returns.
-			SetEvent((*hm)->event);
 			
 			SendCloseMessage(h);
 			return 0;
@@ -159,10 +221,12 @@ LRESULT CALLBACK MonitorProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 
 void hmThread(LPVOID param) {
 	PHOTMON* hm = (PHOTMON*)param;
+	
 	HotmonWindowClass wc(MonitorProc, false);
 	HotmonWindow wnd(wc);
-	(*hm)->hwnd = wnd;
-	SetEvent((*hm)->event);
+	wnd.associate(hm);
+	
+	HotmonContext(hm).sendStartSignal();
 	RunMainLoop();
 }
 
@@ -177,8 +241,11 @@ API int hmCreate(PHOTMON* hm) {
 	
 	memset(*hm, 0, sizeof(HOTMON));
 	
-	(*hm)->event = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!(*hm)->event) return E_EVENT_CREATE;
+	(*hm)->event = CreateEvent(NULL, FALSE, FALSE, NULL);
+	if(!(*hm)->event) {
+		delete hm;
+		return E_EVENT_CREATE;
+	}
 	
 	return E_OK;
 }
@@ -200,8 +267,6 @@ API int hmStart(PHOTMON* hm, DWORD msec) {
 	if(!hm) return E_NULL_ARG;
 	if((*hm)->tid) return E_ALREADY_RUNNING;
 	
-	ResetEvent((*hm)->event);
-	
 	(*hm)->tid = _beginthread(hmThread, 0, (LPVOID)hm);
 	
 	if(WAIT_OBJECT_0 != WaitForSingleObject((*hm)->event, msec))
@@ -214,8 +279,6 @@ API int hmStart(PHOTMON* hm, DWORD msec) {
 API int hmStop(PHOTMON* hm, DWORD msec) {
 	if(!hm) return E_NULL_ARG;
 	if(!(*hm)->tid) return E_NOT_RUNNING;
-	
-	ResetEvent((*hm)->event);
 	
 	SendMessage((*hm)->hwnd, HM_QUIT, (WPARAM)hm, 0);
 	
